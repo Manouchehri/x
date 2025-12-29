@@ -38,7 +38,10 @@ type metadata struct {
 func (d *masqueDialer) parseMetadata(md mdata.Metadata) (err error) {
 	d.md.host = mdutil.GetString(md, mdKeyHost)
 
-	if mdutil.GetBool(md, mdKeyKeepAlive) {
+	// Enable QUIC keepalive by default for reliability through NAT/firewalls
+	// Can be disabled with keepAlive=false
+	keepAlive := mdutil.GetString(md, mdKeyKeepAlive)
+	if keepAlive != "false" && keepAlive != "0" {
 		d.md.keepAlivePeriod = mdutil.GetDuration(md, mdKeyKeepAlivePeriod)
 		if d.md.keepAlivePeriod <= 0 {
 			d.md.keepAlivePeriod = defaultKeepAlivePeriod
