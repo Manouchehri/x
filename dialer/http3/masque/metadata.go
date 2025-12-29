@@ -15,6 +15,8 @@ const (
 	mdKeyMaxIdleTimeout            = "maxIdleTimeout"
 	mdKeyMaxStreams                = "maxStreams"
 	mdKeyConnectionPoolingDisabled = "connectionPoolingDisabled"
+	mdKeyInitialPacketSize         = "initialPacketSize"
+	mdKeyDisablePathMTUDiscovery   = "disablePathMTUDiscovery"
 
 	// Default timeouts to prevent connections from hanging indefinitely
 	defaultHandshakeTimeout = 30 * time.Second
@@ -30,6 +32,10 @@ type metadata struct {
 	maxIdleTimeout   time.Duration
 	handshakeTimeout time.Duration
 	maxStreams       int
+
+	// MTU options
+	initialPacketSize        int
+	disablePathMTUDiscovery  bool
 
 	// Connection pooling
 	connectionPoolingDisabled bool
@@ -59,6 +65,11 @@ func (d *masqueDialer) parseMetadata(md mdata.Metadata) (err error) {
 	}
 
 	d.md.maxStreams = mdutil.GetInt(md, mdKeyMaxStreams)
+
+	// MTU options - for constrained networks (e.g., 1280 MTU requires initialPacketSize=1232)
+	d.md.initialPacketSize = mdutil.GetInt(md, mdKeyInitialPacketSize)
+	d.md.disablePathMTUDiscovery = mdutil.GetBool(md, mdKeyDisablePathMTUDiscovery)
+
 	d.md.connectionPoolingDisabled = mdutil.GetBool(md, mdKeyConnectionPoolingDisabled)
 
 	return nil

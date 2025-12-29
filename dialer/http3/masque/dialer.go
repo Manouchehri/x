@@ -112,9 +112,11 @@ func (d *masqueDialer) Dial(ctx context.Context, addr string, opts ...dialer.Dia
 				TLSClientConfig: tlsCfg,
 				EnableDatagrams: true,
 				QUICConfig: &quic.Config{
-					KeepAlivePeriod:      d.md.keepAlivePeriod,
-					HandshakeIdleTimeout: d.md.handshakeTimeout,
-					MaxIdleTimeout:       d.md.maxIdleTimeout,
+					KeepAlivePeriod:          d.md.keepAlivePeriod,
+					HandshakeIdleTimeout:     d.md.handshakeTimeout,
+					MaxIdleTimeout:           d.md.maxIdleTimeout,
+					InitialPacketSize:        uint16(d.md.initialPacketSize),
+					DisablePathMTUDiscovery:  d.md.disablePathMTUDiscovery,
 					Versions: []quic.Version{
 						quic.Version1,
 						quic.Version2,
