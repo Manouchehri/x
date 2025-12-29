@@ -8,12 +8,13 @@ import (
 )
 
 const (
-	mdKeyHost             = "host"
-	mdKeyKeepAlive        = "keepAlive"
-	mdKeyKeepAlivePeriod  = "ttl"
-	mdKeyHandshakeTimeout = "handshakeTimeout"
-	mdKeyMaxIdleTimeout   = "maxIdleTimeout"
-	mdKeyMaxStreams       = "maxStreams"
+	mdKeyHost                      = "host"
+	mdKeyKeepAlive                 = "keepAlive"
+	mdKeyKeepAlivePeriod           = "ttl"
+	mdKeyHandshakeTimeout          = "handshakeTimeout"
+	mdKeyMaxIdleTimeout            = "maxIdleTimeout"
+	mdKeyMaxStreams                = "maxStreams"
+	mdKeyConnectionPoolingDisabled = "connectionPoolingDisabled"
 )
 
 type metadata struct {
@@ -24,6 +25,9 @@ type metadata struct {
 	maxIdleTimeout   time.Duration
 	handshakeTimeout time.Duration
 	maxStreams       int
+
+	// Connection pooling
+	connectionPoolingDisabled bool
 }
 
 func (d *masqueDialer) parseMetadata(md mdata.Metadata) (err error) {
@@ -38,6 +42,7 @@ func (d *masqueDialer) parseMetadata(md mdata.Metadata) (err error) {
 	d.md.handshakeTimeout = mdutil.GetDuration(md, mdKeyHandshakeTimeout)
 	d.md.maxIdleTimeout = mdutil.GetDuration(md, mdKeyMaxIdleTimeout)
 	d.md.maxStreams = mdutil.GetInt(md, mdKeyMaxStreams)
+	d.md.connectionPoolingDisabled = mdutil.GetBool(md, mdKeyConnectionPoolingDisabled)
 
 	return nil
 }

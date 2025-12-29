@@ -50,7 +50,9 @@ func (c *Client) Close() error {
 // It returns a MasqueConn that can be used by the MASQUE connector.
 // Following the QUIC dialer pattern, this opens a request stream immediately
 // to detect dead connections and allow cache invalidation.
-func (c *Client) Dial(ctx context.Context, addr string) (net.Conn, error) {
+// The optional onClose callback is invoked when the connection is fully closed,
+// used for cleanup when connection pooling is disabled.
+func (c *Client) Dial(ctx context.Context, addr string, onClose func()) (net.Conn, error) {
 	// Create connection if we don't have one (caller checks IsClosed first)
 	if c.clientConn == nil {
 		// Use the transport's Dial function to establish QUIC connection
@@ -80,6 +82,7 @@ func (c *Client) Dial(ctx context.Context, addr string) (net.Conn, error) {
 		reqStream:  reqStream,
 		host:       c.host,
 		log:        c.log,
+		onClose:    onClose,
 	}, nil
 }
 
@@ -91,6 +94,7 @@ type MasqueConn struct {
 	reqStream  *http3.RequestStream // Pre-opened stream for CONNECT-UDP
 	host       string
 	log        logger.Logger
+	onClose    func() // Optional callback when connection should be cleaned up
 }
 
 // GetRequestStream returns the pre-opened HTTP/3 request stream.
@@ -102,6 +106,11 @@ func (c *MasqueConn) GetRequestStream() *http3.RequestStream {
 // GetHost returns the proxy host.
 func (c *MasqueConn) GetHost() string {
 	return c.host
+}
+
+// GetOnClose returns the cleanup callback, if any.
+func (c *MasqueConn) GetOnClose() func() {
+	return c.onClose
 }
 
 // Read implements net.Conn but is not used for MASQUE.

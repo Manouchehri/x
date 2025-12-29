@@ -22,6 +22,7 @@ type DatagramStreamer interface {
 type DatagramConn struct {
 	stream     DatagramStreamer
 	closer     io.Closer // Optional closer for the underlying stream
+	onClose    func()    // Optional callback for additional cleanup (e.g., closing QUIC connection)
 	localAddr  net.Addr
 	remoteAddr net.Addr
 	closed     chan struct{}
@@ -43,10 +44,12 @@ func NewDatagramConn(stream *http3.Stream, laddr, raddr net.Addr) *DatagramConn 
 
 // NewDatagramConnFromRequestStream creates a new DatagramConn wrapping an HTTP/3 request stream.
 // This is used by the client-side connector. The stream will be closed when Close() is called.
-func NewDatagramConnFromRequestStream(stream *http3.RequestStream, laddr, raddr net.Addr) *DatagramConn {
+// The optional onClose callback is invoked after the stream is closed for additional cleanup.
+func NewDatagramConnFromRequestStream(stream *http3.RequestStream, laddr, raddr net.Addr, onClose func()) *DatagramConn {
 	return &DatagramConn{
 		stream:     stream,
 		closer:     stream, // RequestStream implements io.Closer
+		onClose:    onClose,
 		localAddr:  laddr,
 		remoteAddr: raddr,
 		closed:     make(chan struct{}),
@@ -134,6 +137,9 @@ func (c *DatagramConn) Close() error {
 		if c.closer != nil {
 			err = c.closer.Close()
 		}
+		if c.onClose != nil {
+			c.onClose()
+		}
 	})
 	return err
 }
@@ -191,6 +197,7 @@ type StreamReadWriter interface {
 // directly to the HTTP/3 stream body for reliable, ordered byte streams.
 type StreamConn struct {
 	stream     StreamReadWriter
+	onClose    func() // Optional callback for additional cleanup (e.g., closing QUIC connection)
 	localAddr  net.Addr
 	remoteAddr net.Addr
 	closed     chan struct{}
@@ -210,9 +217,11 @@ func NewStreamConn(stream *http3.Stream, laddr, raddr net.Addr) *StreamConn {
 
 // NewStreamConnFromRequestStream creates a new StreamConn wrapping an HTTP/3 request stream (client-side).
 // This is used for TCP CONNECT tunneling where data flows through the stream body.
-func NewStreamConnFromRequestStream(stream *http3.RequestStream, laddr, raddr net.Addr) *StreamConn {
+// The optional onClose callback is invoked after the stream is closed for additional cleanup.
+func NewStreamConnFromRequestStream(stream *http3.RequestStream, laddr, raddr net.Addr, onClose func()) *StreamConn {
 	return &StreamConn{
 		stream:     stream,
+		onClose:    onClose,
 		localAddr:  laddr,
 		remoteAddr: raddr,
 		closed:     make(chan struct{}),
@@ -245,6 +254,9 @@ func (c *StreamConn) Close() error {
 	c.closeOnce.Do(func() {
 		close(c.closed)
 		err = c.stream.Close()
+		if c.onClose != nil {
+			c.onClose()
+		}
 	})
 	return err
 }

@@ -86,6 +86,7 @@ func (c *masqueConnector) connectTCP(ctx context.Context, conn net.Conn, address
 	// Get pre-opened stream from dialer
 	reqStream := masqueConn.GetRequestStream()
 	proxyHost := masqueConn.GetHost()
+	onClose := masqueConn.GetOnClose()
 
 	// Apply connect timeout to the actual stream
 	if c.md.connectTimeout > 0 {
@@ -93,11 +94,14 @@ func (c *masqueConnector) connectTCP(ctx context.Context, conn net.Conn, address
 		defer reqStream.SetDeadline(time.Time{})
 	}
 
-	// Ensure stream is closed on any error
+	// Ensure stream and client are cleaned up on any error
 	success := false
 	defer func() {
 		if !success {
 			reqStream.Close()
+			if onClose != nil {
+				onClose() // Clean up QUIC connection when pooling is disabled
+			}
 		}
 	}()
 
@@ -156,7 +160,7 @@ func (c *masqueConnector) connectTCP(ctx context.Context, conn net.Conn, address
 	}
 
 	// Create stream connection for TCP data transfer
-	streamConn := masque_util.NewStreamConnFromRequestStream(reqStream, conn.LocalAddr(), raddr)
+	streamConn := masque_util.NewStreamConnFromRequestStream(reqStream, conn.LocalAddr(), raddr, onClose)
 
 	success = true // Prevent defer from closing stream - streamConn now owns it
 	return streamConn, nil
@@ -175,6 +179,7 @@ func (c *masqueConnector) connectUDP(ctx context.Context, conn net.Conn, address
 	// Get pre-opened stream from dialer (stream opening happens there for dead connection detection)
 	reqStream := masqueConn.GetRequestStream()
 	proxyHost := masqueConn.GetHost()
+	onClose := masqueConn.GetOnClose()
 
 	// Apply connect timeout to the actual stream
 	if c.md.connectTimeout > 0 {
@@ -182,11 +187,14 @@ func (c *masqueConnector) connectUDP(ctx context.Context, conn net.Conn, address
 		defer reqStream.SetDeadline(time.Time{})
 	}
 
-	// Ensure stream is closed on any error
+	// Ensure stream and client are cleaned up on any error
 	success := false
 	defer func() {
 		if !success {
 			reqStream.Close()
+			if onClose != nil {
+				onClose() // Clean up QUIC connection when pooling is disabled
+			}
 		}
 	}()
 
@@ -266,7 +274,7 @@ func (c *masqueConnector) connectUDP(ctx context.Context, conn net.Conn, address
 	}
 
 	// Create datagram connection wrapping the request stream
-	datagramConn := masque_util.NewDatagramConnFromRequestStream(stream, conn.LocalAddr(), raddr)
+	datagramConn := masque_util.NewDatagramConnFromRequestStream(stream, conn.LocalAddr(), raddr, onClose)
 
 	success = true // Prevent defer from closing stream - datagramConn now owns it
 	return datagramConn, nil

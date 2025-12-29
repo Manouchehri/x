@@ -42,19 +42,24 @@ func (d *masqueDialer) Init(md md.Metadata) (err error) {
 
 // Multiplex implements dialer.Multiplexer interface.
 func (d *masqueDialer) Multiplex() bool {
-	return true
+	return !d.md.connectionPoolingDisabled
 }
 
 func (d *masqueDialer) Dial(ctx context.Context, addr string, opts ...dialer.DialOption) (net.Conn, error) {
 	d.clientMutex.Lock()
 	defer d.clientMutex.Unlock()
 
-	// Check if cached client is still alive
-	client := d.clients[addr]
-	if client != nil && client.IsClosed() {
-		client.Close()
-		delete(d.clients, addr)
-		client = nil
+	var client *Client
+
+	// Only check cache if connection pooling is enabled
+	if !d.md.connectionPoolingDisabled {
+		// Check if cached client is still alive
+		client = d.clients[addr]
+		if client != nil && client.IsClosed() {
+			client.Close()
+			delete(d.clients, addr)
+			client = nil
+		}
 	}
 
 	if client == nil {
@@ -119,16 +124,29 @@ func (d *masqueDialer) Dial(ctx context.Context, addr string, opts ...dialer.Dia
 				},
 			},
 		}
-		d.clients[addr] = client
+		// Only cache the client if connection pooling is enabled
+		if !d.md.connectionPoolingDisabled {
+			d.clients[addr] = client
+		}
+	}
+
+	// Set up cleanup callback if pooling is disabled
+	var onClose func()
+	if d.md.connectionPoolingDisabled {
+		onClose = func() {
+			client.Close()
+		}
 	}
 
 	// Dial opens a request stream - if this fails, connection is dead
-	conn, err := client.Dial(ctx, addr)
+	conn, err := client.Dial(ctx, addr, onClose)
 	if err != nil {
-		// Stream opening failed - connection is dead, remove from cache
+		// Stream opening failed - connection is dead
 		d.options.Logger.Error(err)
 		client.Close()
-		delete(d.clients, addr)
+		if !d.md.connectionPoolingDisabled {
+			delete(d.clients, addr)
+		}
 		return nil, err
 	}
 
