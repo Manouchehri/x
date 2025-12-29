@@ -15,6 +15,11 @@ const (
 	mdKeyMaxIdleTimeout            = "maxIdleTimeout"
 	mdKeyMaxStreams                = "maxStreams"
 	mdKeyConnectionPoolingDisabled = "connectionPoolingDisabled"
+
+	// Default timeouts to prevent connections from hanging indefinitely
+	defaultHandshakeTimeout = 30 * time.Second
+	defaultMaxIdleTimeout   = 60 * time.Second
+	defaultKeepAlivePeriod  = 20 * time.Second // Under typical NAT timeout of 30s
 )
 
 type metadata struct {
@@ -36,11 +41,20 @@ func (d *masqueDialer) parseMetadata(md mdata.Metadata) (err error) {
 	if mdutil.GetBool(md, mdKeyKeepAlive) {
 		d.md.keepAlivePeriod = mdutil.GetDuration(md, mdKeyKeepAlivePeriod)
 		if d.md.keepAlivePeriod <= 0 {
-			d.md.keepAlivePeriod = 10 * time.Second
+			d.md.keepAlivePeriod = defaultKeepAlivePeriod
 		}
 	}
+
 	d.md.handshakeTimeout = mdutil.GetDuration(md, mdKeyHandshakeTimeout)
+	if d.md.handshakeTimeout <= 0 {
+		d.md.handshakeTimeout = defaultHandshakeTimeout
+	}
+
 	d.md.maxIdleTimeout = mdutil.GetDuration(md, mdKeyMaxIdleTimeout)
+	if d.md.maxIdleTimeout <= 0 {
+		d.md.maxIdleTimeout = defaultMaxIdleTimeout
+	}
+
 	d.md.maxStreams = mdutil.GetInt(md, mdKeyMaxStreams)
 	d.md.connectionPoolingDisabled = mdutil.GetBool(md, mdKeyConnectionPoolingDisabled)
 
